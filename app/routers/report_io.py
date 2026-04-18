@@ -40,3 +40,31 @@ def patch_section(sid: str, body: dict = Body(...)):
         )
     Path(p).write_text(json.dumps(data, indent=2, ensure_ascii=False))
     return {"name": name, "content": content, "edited": True}
+
+
+from fastapi import Query
+from fastapi.responses import FileResponse
+
+from app.services.export import render_report_pdf, render_report_docx
+
+
+@router.get("/api/study/{sid}/report/export")
+def export_report(sid: str, format: str = Query(..., pattern="^(pdf|docx)$")):
+    import json
+    s = _store()
+    p = s.result_path(sid, "report.json")
+    if not p.exists():
+        raise HTTPException(status_code=404, detail="report not generated yet")
+    data = json.loads(p.read_text())
+
+    out_name = f"report.{format}"
+    out_path = s.export_path(sid, out_name)
+    if format == "pdf":
+        render_report_pdf(data, out_path)
+        media = "application/pdf"
+    else:
+        render_report_docx(data, out_path)
+        media = (
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+    return FileResponse(str(out_path), media_type=media, filename=out_name)

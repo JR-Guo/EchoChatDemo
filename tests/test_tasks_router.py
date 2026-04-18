@@ -115,3 +115,32 @@ def test_patch_report_section(monkeypatch, tmp_path):
     lv = next(s for s in data["sections"] if s["name"] == "Left Ventricle")
     assert lv["content"] == "EF 55 (edited)"
     assert lv["edited"] is True
+
+
+def test_export_pdf(monkeypatch, tmp_path):
+    engine = FakeEngine(
+        "\n".join([f"{s}: ok." for s in [
+            "Aortic Valve","Atria","Great Vessels","Left Ventricle","Mitral Valve",
+            "Pericardium Pleural","Pulmonic Valve","Right Ventricle","Tricuspid Valve","Summary",
+        ]])
+    )
+    c = _client(monkeypatch, tmp_path, engine=engine)
+    sid = c.post("/api/study").json()["study_id"]
+    src = make_still_dicom(tmp_path / "a.dcm")
+    with src.open("rb") as f:
+        c.post(f"/api/study/{sid}/upload", files={"file": ("a", f, "application/octet-stream")})
+
+    tid = c.post(f"/api/study/{sid}/task/report", json={}).json()["task_id"]
+    import time
+    for _ in range(60):
+        time.sleep(0.05)
+        status = c.get(f"/api/task/{tid}").json()
+        if status.get("status") == "done":
+            break
+
+    r = c.get(f"/api/study/{sid}/report/export?format=pdf")
+    assert r.status_code == 200
+    assert r.content[:4] == b"%PDF"
+    r = c.get(f"/api/study/{sid}/report/export?format=docx")
+    assert r.status_code == 200
+    assert r.content[:2] == b"PK"
