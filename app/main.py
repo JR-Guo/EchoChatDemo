@@ -6,6 +6,7 @@ from app.auth import RequireAuthMiddleware, router as auth_router
 from app.config import get_settings
 from app.routers.meta import router as meta_router
 from app.routers.study import router as study_router
+from app.routers.tasks import router as tasks_router, set_engine
 from app.routers.upload import router as upload_router
 
 _start_time = time.monotonic()
@@ -20,6 +21,7 @@ def create_app() -> FastAPI:
     app.include_router(meta_router)
     app.include_router(upload_router)
     app.include_router(study_router)
+    app.include_router(tasks_router)
 
     @app.get("/healthz")
     def healthz():
@@ -45,6 +47,22 @@ def create_app() -> FastAPI:
     @app.get("/home", response_class=HTMLResponse)
     def home_page():
         return HTMLResponse("<h1>Home (stub)</h1>")
+
+    @app.on_event("startup")
+    async def _load_engine():
+        import os, asyncio
+        if os.environ.get("ECHOCHAT_SKIP_MODEL", "").lower() in ("1", "true", "yes"):
+            return
+        from app.services.echochat_engine import EchoChatEngine, SwiftPtBackend
+
+        settings_local = get_settings()
+        def _build():
+            be = SwiftPtBackend(str(settings_local.model_path))
+            return EchoChatEngine(backend=be)
+
+        eng = await asyncio.to_thread(_build)
+        set_engine(eng)
+        globals()["_model_ready"] = True
 
     return app
 
