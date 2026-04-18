@@ -52,3 +52,23 @@ def test_prompts_contain_templates():
     assert "<measure>" in MEASUREMENT_PROMPT.query_template
     assert "<disease>" in DISEASE_PROMPT.query_template
     assert VQA_PROMPT.query_template == "{question}"
+
+
+def test_presets_subset_of_supported():
+    from constants.diseases import SUPPORT_DISEASES
+    from constants.measurements import SUPPORT_MEASUREMENTS
+    from constants.presets import (
+        MEASUREMENT_PRESETS, DISEASE_PRESETS, VQA_EXAMPLES,
+    )
+
+    for preset in MEASUREMENT_PRESETS.values():
+        for item in preset:
+            assert item in SUPPORT_MEASUREMENTS, f"{item} not in SUPPORT_MEASUREMENTS"
+
+    for preset in DISEASE_PRESETS.values():
+        for item in preset:
+            assert item in SUPPORT_DISEASES, f"{item} not in SUPPORT_DISEASES"
+
+    assert isinstance(VQA_EXAMPLES, list)
+    for q in VQA_EXAMPLES:
+        assert isinstance(q, str) and 5 <= len(q) <= 160
