@@ -1,4 +1,7 @@
+import os
 import time
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -18,9 +21,33 @@ _model_ready = False
 templates = Jinja2Templates(directory="templates")
 
 
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    if os.environ.get("ECHOCHAT_SKIP_MODEL", "").lower() in ("1", "true", "yes"):
+        yield
+        return
+    import asyncio
+    from app.services.echochat_engine import EchoChatEngine, SwiftPtBackend
+
+    settings_local = get_settings()
+
+    def _build():
+        be = SwiftPtBackend(str(settings_local.model_path))
+        return EchoChatEngine(backend=be)
+
+    eng = await asyncio.to_thread(_build)
+    set_engine(eng)
+    global _model_ready
+    _model_ready = True
+    try:
+        yield
+    finally:
+        pass
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
-    app = FastAPI(title="EchoChat Demo", version="0.1.0")
+    app = FastAPI(title="EchoChat Demo", version="0.1.0", lifespan=_lifespan)
     app.add_middleware(RequireAuthMiddleware)
     app.include_router(auth_router)
     app.include_router(meta_router)
@@ -93,22 +120,6 @@ def create_app() -> FastAPI:
         return templates.TemplateResponse(
             request, "workspace.html", {"study_id": study_id},
         )
-
-    @app.on_event("startup")
-    async def _load_engine():
-        import os, asyncio
-        if os.environ.get("ECHOCHAT_SKIP_MODEL", "").lower() in ("1", "true", "yes"):
-            return
-        from app.services.echochat_engine import EchoChatEngine, SwiftPtBackend
-
-        settings_local = get_settings()
-        def _build():
-            be = SwiftPtBackend(str(settings_local.model_path))
-            return EchoChatEngine(backend=be)
-
-        eng = await asyncio.to_thread(_build)
-        set_engine(eng)
-        globals()["_model_ready"] = True
 
     return app
 
