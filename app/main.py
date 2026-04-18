@@ -5,6 +5,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from app.auth import RequireAuthMiddleware, router as auth_router
 from app.config import get_settings
 from app.routers.meta import router as meta_router
+from app.routers.report_io import router as report_io_router
 from app.routers.study import router as study_router
 from app.routers.tasks import router as tasks_router, set_engine
 from app.routers.upload import router as upload_router
@@ -22,6 +23,7 @@ def create_app() -> FastAPI:
     app.include_router(upload_router)
     app.include_router(study_router)
     app.include_router(tasks_router)
+    app.include_router(report_io_router)
 
     @app.get("/healthz")
     def healthz():

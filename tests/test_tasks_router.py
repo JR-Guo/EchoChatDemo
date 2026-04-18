@@ -74,3 +74,44 @@ def test_start_report_and_stream(monkeypatch, tmp_path):
     result = c.get(f"/api/task/{tid}").json()
     assert result.get("status") == "done"
     assert len(result["sections"]) == 10
+
+
+import time as _time
+from tests.fixtures.make_dicom import make_still_dicom as _make_still_dicom
+
+
+def test_patch_report_section(monkeypatch, tmp_path):
+    engine = FakeEngine(
+        "\n".join([f"{s}: ok." for s in [
+            "Aortic Valve","Atria","Great Vessels","Left Ventricle","Mitral Valve",
+            "Pericardium Pleural","Pulmonic Valve","Right Ventricle","Tricuspid Valve","Summary",
+        ]])
+    )
+    c = _client(monkeypatch, tmp_path, engine=engine)
+    sid = c.post("/api/study").json()["study_id"]
+    src = _make_still_dicom(tmp_path / "a.dcm")
+    with src.open("rb") as f:
+        c.post(f"/api/study/{sid}/upload",
+               files={"file": ("a", f, "application/octet-stream")})
+
+    tid = c.post(f"/api/study/{sid}/task/report", json={}).json()["task_id"]
+    # wait for report.json to land on disk
+    for _ in range(50):
+        _time.sleep(0.05)
+        result = c.get(f"/api/task/{tid}").json()
+        if result.get("status") == "done":
+            break
+
+    r = c.patch(f"/api/study/{sid}/report/section",
+                json={"section": "Left Ventricle", "content": "EF 55 (edited)"})
+    assert r.status_code == 200
+    assert r.json()["edited"] is True
+
+    from pathlib import Path
+    import json as J
+    p = Path(tmp_path) / "sessions" / sid / "results" / "report.json"
+    assert p.exists()
+    data = J.loads(p.read_text())
+    lv = next(s for s in data["sections"] if s["name"] == "Left Ventricle")
+    assert lv["content"] == "EF 55 (edited)"
+    assert lv["edited"] is True
