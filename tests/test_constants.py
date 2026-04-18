@@ -44,3 +44,11 @@ def test_view_labels():
     assert view_group("Apical 2C 2D") == "a2c"
     assert is_doppler("Parasternal Short Axis Tricuspid Regurgitation CW") is True
     assert is_doppler("Apical 4C 2D") is False
+
+
+def test_prompts_contain_templates():
+    from constants.prompts import REPORT_PROMPT, MEASUREMENT_PROMPT, DISEASE_PROMPT, VQA_PROMPT
+    assert "echo report" in REPORT_PROMPT.system.lower() or "echo" in REPORT_PROMPT.system.lower()
+    assert "<measure>" in MEASUREMENT_PROMPT.query_template
+    assert "<disease>" in DISEASE_PROMPT.query_template
+    assert VQA_PROMPT.query_template == "{question}"
