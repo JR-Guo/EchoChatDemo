@@ -1,0 +1,15 @@
+<div class="tab-panel p-6" data-panel="report">
+  <div class="flex items-center justify-between mb-5">
+    <div>
+      <h3 class="font-semibold text-lg">Report</h3>
+      <p class="text-sm text-muted">Generate a sectioned echocardiography report. You can edit any section after generation.</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button id="report-run" class="px-4 py-2 rounded-lg bg-primary text-white font-medium hover:bg-primary/90 transition">Generate report</button>
+      <a id="report-pdf" href="#" class="hidden px-3 py-2 rounded-lg border border-slate-200 text-sm hover:bg-slate-50 transition">Export PDF</a>
+      <a id="report-docx" href="#" class="hidden px-3 py-2 rounded-lg border border-slate-200 text-sm hover:bg-slate-50 transition">Export DOCX</a>
+    </div>
+  </div>
+  <div id="report-progress" class="text-sm text-muted mb-3"></div>
+  <div id="report-sections" class="space-y-1"></div>
+</div>

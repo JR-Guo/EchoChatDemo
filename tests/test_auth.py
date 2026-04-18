@@ -82,3 +82,16 @@ def test_upload_page_renders(monkeypatch, tmp_path):
     assert r.status_code == 200
     assert "Drag DICOM" in r.text
     assert "upload.js" in r.text
+
+
+def test_workspace_page_renders(monkeypatch, tmp_path):
+    c = _make_client(monkeypatch, tmp_path)
+    c.post("/login", data={"password": "pw"})
+    r = c.get("/workspace/some-study-id")
+    assert r.status_code == 200
+    assert "Report" in r.text
+    assert "Measurement" in r.text
+    assert "Disease" in r.text
+    assert "VQA" in r.text
+    assert "workspace.js" in r.text
+    assert "window.ECHOCHAT_STUDY_ID" in r.text

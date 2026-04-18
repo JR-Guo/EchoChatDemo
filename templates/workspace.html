@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Workspace · EchoChat{% endblock %}
+{% block body %}
+<header class="sticky top-0 z-10 bg-white/90 backdrop-blur border-b border-slate-200">
+  <div class="max-w-[1400px] mx-auto px-6 h-14 flex items-center justify-between">
+    <a href="/home" class="flex items-center gap-2 text-muted hover:text-ink transition">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
+      <span class="text-sm">Home</span>
+    </a>
+    <div class="text-xs text-muted font-mono">study {{ study_id }}</div>
+  </div>
+</header>
+
+<main class="max-w-[1400px] mx-auto px-6 py-6 grid grid-cols-12 gap-6">
+  <aside class="col-span-12 lg:col-span-4 xl:col-span-3 space-y-4">
+    <div class="card p-5">
+      <h2 class="font-semibold mb-3">Study</h2>
+      <div id="clips-list" class="space-y-2 max-h-[400px] overflow-auto pr-1"></div>
+      <a href="/upload" class="mt-4 inline-block text-primary text-sm hover:underline">+ Add more clips</a>
+    </div>
+    <div class="card p-5">
+      <h2 class="font-semibold mb-3">Capabilities</h2>
+      <div id="tasks-avail" class="space-y-2 text-sm"></div>
+    </div>
+  </aside>
+
+  <section class="col-span-12 lg:col-span-8 xl:col-span-9 card overflow-hidden">
+    <nav class="flex border-b border-slate-100" role="tablist">
+      <button class="tab-item" data-tab="report" aria-selected="true">Report</button>
+      <button class="tab-item" data-tab="measurement" aria-selected="false">Measurement</button>
+      <button class="tab-item" data-tab="disease" aria-selected="false">Disease</button>
+      <button class="tab-item" data-tab="vqa" aria-selected="false">VQA</button>
+    </nav>
+
+    {% include 'components/task_tab_report.html' %}
+    {% include 'components/task_tab_measurement.html' %}
+    {% include 'components/task_tab_disease.html' %}
+    {% include 'components/task_tab_vqa.html' %}
+  </section>
+</main>
+
+<script>
+  window.ECHOCHAT_STUDY_ID = {{ study_id | tojson }};
+</script>
+<script src="/static/js/editor.js"></script>
+<script src="/static/js/workspace.js"></script>
+{% endblock %}

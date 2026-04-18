@@ -1,0 +1,13 @@
+<div class="tab-panel p-6 hidden" data-panel="vqa">
+  <h3 class="font-semibold text-lg">Visual Question Answering</h3>
+  <p class="text-sm text-muted mb-4">Ask a focused clinical question about the uploaded study.</p>
+  <select id="vqa-preset" class="w-full md:w-96 px-3 py-2 border border-slate-200 rounded-lg mb-3 hidden">
+    <option value="">— Example questions —</option>
+  </select>
+  <div id="vqa-log" class="space-y-3 mb-4 max-h-[420px] overflow-auto pr-1"></div>
+  <form id="vqa-form" class="flex items-center gap-2">
+    <input id="vqa-q" type="text" placeholder="e.g. Describe the wall motion of the LV." class="flex-1 px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30"/>
+    <button class="px-4 py-2 rounded-lg bg-primary text-white font-medium hover:bg-primary/90 transition">Send</button>
+  </form>
+  <div id="vqa-progress" class="text-sm text-muted mt-3"></div>
+</div>

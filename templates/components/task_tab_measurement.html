@@ -1,0 +1,29 @@
+<div class="tab-panel p-6 hidden" data-panel="measurement">
+  <div class="flex items-start justify-between mb-5 gap-4">
+    <div>
+      <h3 class="font-semibold text-lg">Measurement</h3>
+      <p class="text-sm text-muted">Select items and run. Results stream in below.</p>
+    </div>
+    <div>
+      <button id="measure-run" class="px-4 py-2 rounded-lg bg-primary text-white font-medium hover:bg-primary/90 transition">Run selected</button>
+    </div>
+  </div>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div>
+      <div id="measure-presets" class="flex flex-wrap gap-2 mb-3"></div>
+      <div id="measure-items" class="max-h-[420px] overflow-auto border border-slate-100 rounded-lg divide-y"></div>
+    </div>
+    <div>
+      <h4 class="text-sm font-semibold text-muted mb-2">Results</h4>
+      <div class="border border-slate-100 rounded-lg overflow-hidden">
+        <table class="w-full text-sm">
+          <thead class="bg-slate-50 text-muted">
+            <tr><th class="text-left px-3 py-2">Measurement</th><th class="text-right px-3 py-2">Value</th><th class="text-left px-3 py-2">Unit</th></tr>
+          </thead>
+          <tbody id="measure-results" class="divide-y"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div id="measure-progress" class="text-sm text-muted mt-3"></div>
+</div>
