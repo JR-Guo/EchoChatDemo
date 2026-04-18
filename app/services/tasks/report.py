@@ -15,29 +15,64 @@ _LOG = logging.getLogger("echochat.tasks.report")
 
 
 def _split_sections(text: str) -> dict[str, str]:
-    """Parse a model response with 'Section Name: content' lines.
+    """Parse a model response by locating each known section header in order.
 
-    Tolerant of *common* formatting variants: optional Markdown bold around
-    the section name (`**Aortic Valve**: …`), hyphen or em-dash separator,
-    and case-insensitive section matching.
+    The model often omits the trailing colon and writes everything on a few
+    long lines, e.g.:
+        "Aortic Valve The aortic valve is trileaflet. Atria The left atrial
+         size is normal. Great Vessels ..."
+
+    We split by searching for every section name (whole-word, case-sensitive
+    since the trained model reproduces them with the correct capitalisation)
+    and take whatever text sits between one header and the next.
     """
     out: dict[str, str] = {s: "" for s in REPORT_SECTIONS}
-    pattern = re.compile(
-        r"^\s*\**\s*("
+
+    if not text:
+        return out
+
+    header_re = re.compile(
+        r"(?:^|[^A-Za-z])("
         + "|".join(re.escape(s) for s in REPORT_SECTIONS)
-        + r")\s*\**\s*[:\-\u2014]\s*(.*)$",
-        re.IGNORECASE,
+        + r")(?=[^A-Za-z]|$)"
     )
 
-    current: str | None = None
-    for line in text.splitlines():
-        m = pattern.match(line)
-        if m:
-            name = next(s for s in REPORT_SECTIONS if s.lower() == m.group(1).lower())
-            current = name
-            out[current] = (out[current] + ("\n" if out[current] else "") + m.group(2)).strip()
-        elif current and line.strip():
-            out[current] = (out[current] + "\n" + line).strip()
+    hits: list[tuple[str, int, int]] = []  # (name, start, end-after-name)
+    for m in header_re.finditer(text):
+        name = m.group(1)
+        hits.append((name, m.start(1), m.end(1)))
+
+    # Fallback: case-insensitive search if strict-case missed everything
+    if not hits:
+        ci_re = re.compile(
+            r"(?:^|[^A-Za-z])("
+            + "|".join(re.escape(s) for s in REPORT_SECTIONS)
+            + r")(?=[^A-Za-z]|$)",
+            re.IGNORECASE,
+        )
+        for m in ci_re.finditer(text):
+            # Map back to canonical capitalisation
+            canonical = next(
+                s for s in REPORT_SECTIONS if s.lower() == m.group(1).lower()
+            )
+            hits.append((canonical, m.start(1), m.end(1)))
+
+    if not hits:
+        return out
+
+    # Extract content between each header and the next.
+    for i, (name, _start, end) in enumerate(hits):
+        next_start = hits[i + 1][1] if i + 1 < len(hits) else len(text)
+        body = text[end:next_start]
+        # Strip a single leading separator (colon / dash / em-dash / space)
+        body = re.sub(r"^[\s:\-\u2014]+", "", body)
+        body = body.strip()
+        if body:
+            # A section may legitimately appear twice in the output; keep the
+            # first non-empty occurrence.
+            if not out[name]:
+                out[name] = body
+
     return out
 
 
@@ -67,9 +102,6 @@ async def run_report(
 
     sections_map = _split_sections(raw)
 
-    # Fallback: if no section matched at all, dump the raw text into
-    # Summary so the clinician at least sees the model's response and can
-    # edit it into place.
     if all(not v for v in sections_map.values()) and raw.strip():
         sections_map["Summary"] = raw.strip()
 

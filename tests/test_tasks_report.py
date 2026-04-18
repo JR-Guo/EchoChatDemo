@@ -66,3 +66,29 @@ async def test_report_missing_section_preserves_placeholder(tmp_path):
     assert names.count("Summary") == 1
     summary = next(s for s in result.sections if s.name == "Summary")
     assert "minimal" in summary.content.lower()
+
+
+async def test_report_parses_model_output_without_colons(tmp_path):
+    hub = ProgressHub()
+    engine = FakeEngine(
+        "Aortic Valve The aortic valve is trileaflet. "
+        "Atria The left atrial size is normal. "
+        "Great Vessels The aortic root is normal size. "
+        "Left Ventricle EF 60%. "
+        "Mitral Valve Normal. "
+        "Pericardium Pleural No effusion. "
+        "Pulmonic Valve Not well visualized. "
+        "Right Ventricle Normal. "
+        "Tricuspid Valve Trace TR. "
+        "Summary Unremarkable."
+    )
+    clips = [Clip(file_id="f1", original_filename="x", kind="dicom",
+                  raw_path="/x", converted_path="/a.mp4", is_video=True)]
+    result = await run_report(task_id="t3", clips=clips, engine=engine, hub=hub)
+    assert result.status == "done"
+    by_name = {s.name: s.content for s in result.sections}
+    assert "trileaflet" in by_name["Aortic Valve"]
+    assert "left atrial" in by_name["Atria"]
+    assert "aortic root" in by_name["Great Vessels"]
+    assert "EF 60%" in by_name["Left Ventricle"]
+    assert "Unremarkable" in by_name["Summary"]
