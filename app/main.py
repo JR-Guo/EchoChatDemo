@@ -4,6 +4,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from app.auth import RequireAuthMiddleware, router as auth_router
 from app.config import get_settings
+from app.routers.meta import router as meta_router
 
 _start_time = time.monotonic()
 _model_ready = False
@@ -14,6 +15,7 @@ def create_app() -> FastAPI:
     app = FastAPI(title="EchoChat Demo", version="0.1.0")
     app.add_middleware(RequireAuthMiddleware)
     app.include_router(auth_router)
+    app.include_router(meta_router)
 
     @app.get("/healthz")
     def healthz():
