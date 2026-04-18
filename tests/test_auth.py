@@ -73,3 +73,12 @@ def test_home_page_has_task_cards(monkeypatch, tmp_path):
     assert "Disease Diagnosis" in r.text
     assert "Visual Question Answering" in r.text
     assert "Start new study" in r.text
+
+
+def test_upload_page_renders(monkeypatch, tmp_path):
+    c = _make_client(monkeypatch, tmp_path)
+    c.post("/login", data={"password": "pw"})
+    r = c.get("/upload")
+    assert r.status_code == 200
+    assert "Drag DICOM" in r.text
+    assert "upload.js" in r.text
