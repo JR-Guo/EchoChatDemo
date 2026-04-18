@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual envs
+venv/
+.venv/
+env/
+.env
+
+# Runtime data (session directories live on NFS, not in git)
+data/
+sessions/
+logs/
+*.log
+
+# Exports
+exports/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# OS
+Thumbs.db
+
+# Built frontend assets (we don't build; but leave room)
+dist/
+build/
+node_modules/
+
+# Large artifacts
+*.mp4
+*.dcm
+*.dicom
+*.zip
+*.tar.gz
+*.safetensors
+*.bin
+
+# Project-local override
+.env.local
+secrets.*
+
+# Claude Code local state (settings.local.json stays local by convention)
+.claude/settings.local.json
+.claude/hooks/
