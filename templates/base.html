@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>{% block title %}EchoChat Demo{% endblock %}</title>
+  <link rel="icon" href="/static/img/logo.svg"/>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"/>
+  <link rel="stylesheet" href="/static/css/app.css"/>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#0E6AAD',
+            accent:  '#1F9D8F',
+            warning: '#E09B3A',
+            danger:  '#C0392B',
+            surface: '#FFFFFF',
+            page:    '#F7F9FB',
+            ink:     '#1F2937',
+            muted:   '#6B7280',
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+            mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
+          },
+          boxShadow: {
+            card: '0 1px 3px rgba(16,24,40,0.04)',
+            cardHover: '0 4px 12px rgba(16,24,40,0.08)',
+          },
+          borderRadius: {
+            xl2: '12px',
+          },
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-page text-ink font-sans antialiased">
+  {% block body %}{% endblock %}
+</body>
+</html>
