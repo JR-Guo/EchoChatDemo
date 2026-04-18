@@ -63,3 +63,71 @@ async def upload_file(sid: str, file: UploadFile = File(...)):
         "size": len(data),
         "saved_as": str(raw),
     }
+
+
+import asyncio
+import json
+
+from fastapi import Request
+from sse_starlette.sse import EventSourceResponse
+
+from app.services.dicom_pipeline import convert_dicom
+from app.services.view_classifier import ViewClassifier
+from app.services.progress import ProgressEvent, hub
+
+
+def _view_client() -> ViewClassifier:
+    return ViewClassifier(base_url=get_settings().view_classifier_url)
+
+
+@router.get("/api/study/{sid}/process")
+async def process_sse(sid: str, request: Request):
+    s = _store()
+
+    async def gen():
+        study = s.load_study(sid)
+        vc = _view_client()
+
+        yield {"event": "phase", "data": json.dumps({"phase": "start"})}
+
+        for clip in study.clips:
+            if clip.converted_path:
+                continue
+            raw = clip.raw_path
+
+            yield {"event": "phase",
+                   "data": json.dumps({"phase": "parsing_dicom", "file_id": clip.file_id})}
+            try:
+                result = await asyncio.to_thread(
+                    convert_dicom,
+                    raw,
+                    s.converted_path(sid, clip.file_id, ""),
+                )
+            except Exception as e:
+                yield {"event": "error",
+                       "data": json.dumps({"file_id": clip.file_id, "reason": str(e)})}
+                continue
+
+            clip.converted_path = str(result.output_path)
+            clip.is_video = result.is_video
+
+            yield {"event": "phase",
+                   "data": json.dumps({"phase": "classifying", "file_id": clip.file_id})}
+            outcome = await vc.classify(result.output_path)
+            clip.view = outcome.view
+            clip.confidence = outcome.confidence
+
+            yield {"event": "clip", "data": json.dumps({
+                "file_id": clip.file_id,
+                "view": clip.view,
+                "confidence": clip.confidence,
+                "is_video": clip.is_video,
+                "raw_class": outcome.raw_class,
+            })}
+
+            s.save_study(study)
+
+        yield {"event": "phase", "data": json.dumps({"phase": "done"})}
+        yield {"event": "done", "data": json.dumps({})}
+
+    return EventSourceResponse(gen())

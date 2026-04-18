@@ -44,3 +44,31 @@ def test_upload_rejects_non_dicom(monkeypatch, tmp_path):
         r = c.post(f"/api/study/{sid}/upload", files={"file": ("x.dcm", f, "application/octet-stream")})
     assert r.status_code == 400
     assert "DICOM" in r.json()["detail"]
+
+
+import respx
+import httpx
+from tests.fixtures.make_dicom import make_cine_dicom
+
+
+@respx.mock
+def test_process_sse_emits_events(monkeypatch, tmp_path):
+    c = _client(monkeypatch, tmp_path)
+    sid = c.post("/api/study").json()["study_id"]
+
+    src = make_cine_dicom(tmp_path / "cine.dcm", frames=3, shape=(16, 16))
+    with src.open("rb") as f:
+        c.post(f"/api/study/{sid}/upload",
+               files={"file": ("weird_cine", f, "application/octet-stream")})
+
+    respx.post("http://127.0.0.1:8995/classify").mock(
+        return_value=httpx.Response(200, json={"class_name": "Apical 4C 2D", "confidence": 0.8})
+    )
+
+    with c.stream("GET", f"/api/study/{sid}/process") as r:
+        body = b"".join(r.iter_bytes())
+
+    text = body.decode()
+    assert "event: phase" in text
+    assert "event: clip" in text
+    assert "event: done" in text
