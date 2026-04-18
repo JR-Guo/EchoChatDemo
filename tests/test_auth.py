@@ -52,3 +52,12 @@ def test_healthz_is_public(monkeypatch, tmp_path):
     c = _make_client(monkeypatch, tmp_path)
     r = c.get("/healthz")
     assert r.status_code == 200
+
+
+def test_login_page_renders_english_form(monkeypatch, tmp_path):
+    c = _make_client(monkeypatch, tmp_path)
+    r = c.get("/login")
+    assert r.status_code == 200
+    assert "Sign in" in r.text
+    assert "password" in r.text.lower()
+    assert "<html lang=\"en\"" in r.text

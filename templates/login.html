@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Sign in · EchoChat Demo{% endblock %}
+{% block body %}
+<main class="min-h-screen grid place-items-center px-6">
+  <div class="w-full max-w-sm">
+    <div class="flex items-center gap-3 justify-center mb-10">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0E6AAD" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h3l2-7 3 14 2-10 3 7h5"/></svg>
+      <span class="text-xl font-semibold tracking-tight">EchoChat Demo</span>
+    </div>
+    <div class="card p-8">
+      <h1 class="text-lg font-semibold mb-1">Sign in</h1>
+      <p class="text-sm text-muted mb-6">Enter the shared demo password to continue.</p>
+      {% if error %}
+      <div class="mb-4 px-3 py-2 rounded-lg bg-red-50 text-danger text-sm">{{ error }}</div>
+      {% endif %}
+      <form method="post" action="/login" class="space-y-4">
+        <label class="block">
+          <span class="text-sm font-medium">Password</span>
+          <input type="password" name="password" autofocus required
+                 class="mt-1 w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40" />
+        </label>
+        <button type="submit" class="w-full py-2 rounded-lg bg-primary text-white font-medium hover:bg-primary/90 transition">
+          Continue
+        </button>
+      </form>
+    </div>
+    <p class="text-xs text-muted text-center mt-6">For reviewer use only.</p>
+  </div>
+</main>
+{% endblock %}
