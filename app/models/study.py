@@ -28,6 +28,11 @@ class Clip(BaseModel):
     confidence: Optional[float] = None    # classifier confidence in [0, 1]
     is_video: bool = False
 
+    @property
+    def effective_view(self) -> Optional[str]:
+        """User override takes precedence over model prediction."""
+        return self.user_view or self.view
+
 
 class TasksAvailability(BaseModel):
     """Per-task runnability flags derived from clip view coverage."""
