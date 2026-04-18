@@ -29,3 +29,18 @@ def test_report_sections():
         "Tricuspid Valve",
         "Summary",
     ]
+
+
+def test_view_labels():
+    from constants.view_labels import VIEW_LABELS, view_group, is_doppler
+    assert len(VIEW_LABELS) == 38
+    assert "Apical 4C 2D" in VIEW_LABELS
+    assert view_group("Apical 4C 2D") == "a4c"
+    assert view_group("Parasternal Long Axis 2D") == "plax"
+    from constants.view_labels import view_coarse_group
+    assert view_coarse_group("Parasternal Mitral Valve Short Axis") == "psax"
+    assert view_group("Subxiphoid IVC 2D") == "ivc"
+    assert view_group("Suprasternal Notch") == "ssn"
+    assert view_group("Apical 2C 2D") == "a2c"
+    assert is_doppler("Parasternal Short Axis Tricuspid Regurgitation CW") is True
+    assert is_doppler("Apical 4C 2D") is False
