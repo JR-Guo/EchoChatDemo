@@ -61,3 +61,15 @@ def test_login_page_renders_english_form(monkeypatch, tmp_path):
     assert "Sign in" in r.text
     assert "password" in r.text.lower()
     assert "<html lang=\"en\"" in r.text
+
+
+def test_home_page_has_task_cards(monkeypatch, tmp_path):
+    c = _make_client(monkeypatch, tmp_path)
+    c.post("/login", data={"password": "pw"})
+    r = c.get("/home")
+    assert r.status_code == 200
+    assert "Report Generation" in r.text
+    assert "Measurement" in r.text
+    assert "Disease Diagnosis" in r.text
+    assert "Visual Question Answering" in r.text
+    assert "Start new study" in r.text
