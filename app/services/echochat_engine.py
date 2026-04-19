@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from typing import Protocol, Sequence
 
 
@@ -35,13 +36,18 @@ class EchoChatEngine:
 
 
 class SwiftPtBackend:
-    """Real backend using ms_swift PtEngine. Imported lazily so unit tests never load torch."""
+    """Real backend using ms_swift PtEngine. Imported lazily so unit tests never load torch.
+
+    attn_impl defaults to torch's native `sdpa` (Scaled Dot Product Attention). Set
+    ECHOCHAT_ATTN_IMPL=flash_attn to use flash-attention 2 when available.
+    """
 
     def __init__(self, model_path: str):
         from swift.llm import PtEngine, get_template
 
+        attn_impl = os.environ.get("ECHOCHAT_ATTN_IMPL", "sdpa")
         self.engine = PtEngine(
-            model_path, torch_dtype="bfloat16", attn_impl="flash_attn", use_hf=True
+            model_path, torch_dtype="bfloat16", attn_impl=attn_impl, use_hf=True
         )
         self.template = get_template(
             self.engine.model_meta.template,
