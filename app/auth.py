@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Form, HTTPException, Request, Response
+from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from itsdangerous import BadSignature, URLSafeSerializer
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -27,6 +27,14 @@ def is_authenticated(request: Request) -> bool:
     return data.get("ok") is True
 
 
+def _is_https(request: Request) -> bool:
+    """Detect HTTPS even behind a reverse proxy (nginx sets X-Forwarded-Proto)."""
+    proto = request.headers.get("x-forwarded-proto")
+    if proto:
+        return proto.split(",")[0].strip().lower() == "https"
+    return request.url.scheme == "https"
+
+
 class RequireAuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
@@ -41,13 +49,18 @@ router = APIRouter()
 
 
 @router.post("/login")
-def login(password: str = Form(...)):
+def login(request: Request, password: str = Form(...)):
     if password != get_settings().shared_password:
         raise HTTPException(status_code=401, detail="Invalid password.")
     token = _serializer().dumps({"ok": True})
     resp = RedirectResponse("/home", status_code=303)
     resp.set_cookie(
-        _COOKIE_NAME, token, httponly=True, samesite="lax", max_age=24 * 3600
+        _COOKIE_NAME,
+        token,
+        httponly=True,
+        samesite="lax",
+        secure=_is_https(request),
+        max_age=24 * 3600,
     )
     return resp
 
