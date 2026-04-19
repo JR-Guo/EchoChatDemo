@@ -36,4 +36,4 @@ def test_settings_defaults(monkeypatch, tmp_path):
     get_settings.cache_clear()
     s = get_settings()
 
-    assert s.view_classifier_url == "http://127.0.0.1:8995"
+    assert s.view_classifier_url == "http://127.0.0.1:8996"

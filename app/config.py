@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Optional
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -15,7 +16,10 @@ class Settings(BaseSettings):
     data_dir: Path = Field(alias="ECHOCHAT_DATA_DIR")
 
     view_classifier_url: str = Field(
-        default="http://127.0.0.1:8995", alias="VIEW_CLASSIFIER_URL"
+        default="http://127.0.0.1:8996", alias="VIEW_CLASSIFIER_URL"
+    )
+    view_classifier_api_key: Optional[str] = Field(
+        default=None, alias="VIEW_CLASSIFIER_API_KEY"
     )
 
     shared_password: str = Field(alias="SHARED_PASSWORD")

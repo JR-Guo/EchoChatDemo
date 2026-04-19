@@ -77,7 +77,7 @@ from app.services.progress import ProgressEvent, hub
 
 
 def _view_client() -> ViewClassifier:
-    return ViewClassifier(base_url=get_settings().view_classifier_url)
+    return ViewClassifier(base_url=get_settings().view_classifier_url, api_key=get_settings().view_classifier_api_key)
 
 
 @router.get("/api/study/{sid}/process")
