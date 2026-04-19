@@ -31,8 +31,8 @@ def _new_study_with_clip(c, tmp_path):
 def test_get_study_returns_tasks_availability(monkeypatch, tmp_path):
     c = _authed_client(monkeypatch, tmp_path)
     sid = _new_study_with_clip(c, tmp_path)
-    respx.post("http://127.0.0.1:8995/classify").mock(
-        return_value=httpx.Response(200, json={"class_name": "Apical 4C 2D", "confidence": 0.7})
+    respx.post("http://127.0.0.1:8996/v1/chat/completions").mock(
+        return_value=httpx.Response(200, json={"classification": {"original_view_name": "Apical 4C 2D", "confidence": 0.7}})
     )
     with c.stream("GET", f"/api/study/{sid}/process") as r:
         _ = b"".join(r.iter_bytes())

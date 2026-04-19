@@ -61,8 +61,8 @@ def test_process_sse_emits_events(monkeypatch, tmp_path):
         c.post(f"/api/study/{sid}/upload",
                files={"file": ("weird_cine", f, "application/octet-stream")})
 
-    respx.post("http://127.0.0.1:8995/classify").mock(
-        return_value=httpx.Response(200, json={"class_name": "Apical 4C 2D", "confidence": 0.8})
+    respx.post("http://127.0.0.1:8996/v1/chat/completions").mock(
+        return_value=httpx.Response(200, json={"classification": {"original_view_name": "Apical 4C 2D", "confidence": 0.8}})
     )
 
     with c.stream("GET", f"/api/study/{sid}/process") as r:

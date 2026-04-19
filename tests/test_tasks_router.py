@@ -52,8 +52,8 @@ def test_start_report_and_stream(monkeypatch, tmp_path):
         c.post(f"/api/study/{sid}/upload",
                files={"file": ("a.dcm", f, "application/octet-stream")})
 
-    respx.post("http://127.0.0.1:8995/classify").mock(
-        return_value=httpx.Response(200, json={"class_name": "Apical 4C 2D", "confidence": 0.9})
+    respx.post("http://127.0.0.1:8996/v1/chat/completions").mock(
+        return_value=httpx.Response(200, json={"classification": {"original_view_name": "Apical 4C 2D", "confidence": 0.9}})
     )
     with c.stream("GET", f"/api/study/{sid}/process") as r:
         _ = b"".join(r.iter_bytes())
