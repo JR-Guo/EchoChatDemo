@@ -63,6 +63,12 @@ def _make_thumbnail(bgr: np.ndarray, out: Path, max_side: int = 240) -> Path:
     cv2.imwrite(str(out), bgr)
     return out
 
+def validate_US(dcm_path):
+    ds = pydicom.dcmread(dcm_path, stop_before_pixels=True)
+    modal = ds.Modality if hasattr(ds, 'Modality') else 'US'
+    if modal != 'US':
+        return False
+    return True
 
 def convert_dicom(src: Path, target_stem: Path, *, fps: int = 20) -> ConvertResult:
     """Convert a DICOM at `src` into mp4 (cine) or png (still).
@@ -75,7 +81,10 @@ def convert_dicom(src: Path, target_stem: Path, *, fps: int = 20) -> ConvertResu
     src = Path(src)
     target_stem = Path(target_stem)
     if not looks_like_dicom(src):
-        raise ValueError(f"not a DICOM: {src}")
+        raise ValueError(f"not a Echocardiography DICOM: {src}")
+    
+    if not validate_US(src):
+        raise ValueError(f"not a Echocardiography DICOM: {src}")
 
     ds = pydicom.dcmread(str(src))
     pixels = ds.pixel_array
