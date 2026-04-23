@@ -9,7 +9,9 @@ from app.config import get_settings
 
 
 _COOKIE_NAME = "echochat_session"
-_PUBLIC_PATHS = {"/login", "/logout", "/healthz", "/static", "/favicon.ico"}
+# /api/mobile/v1 enforces its own auth via Bearer JWT (see app.mobile_auth).
+# Including it here lets the cookie middleware pass those requests through.
+_PUBLIC_PATHS = {"/login", "/logout", "/healthz", "/static", "/favicon.ico", "/api/mobile/v1"}
 
 
 def _serializer() -> URLSafeSerializer:
