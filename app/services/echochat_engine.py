@@ -149,20 +149,33 @@ class SwiftPtBackend:
         return gen[0].choices[0].message.content
 
     def infer_stream_sync(self, system: str, query: str, images, videos):
-        """Yield running-total strings as the model generates. Caller computes deltas."""
+        """Yield running-total strings as the model generates. Caller computes deltas.
+
+        With `stream=True`, ms-swift's PtEngine.infer returns a list of iterators
+        (one per input request), where each iterator yields ChatCompletionStreamResponse
+        objects carrying `.choices[0].delta.content` (OpenAI-style incremental text).
+        """
         from swift.llm import RequestConfig
 
         req = self._build_request(system, query, images, videos)
         cfg = RequestConfig(max_tokens=10000, temperature=0, stream=True)
+        results = self.engine.infer([req], cfg)
+        if not results:
+            return
+        iterator = results[0]
         running = ""
-        for batch in self.engine.infer([req], cfg):
-            # PtEngine in stream mode yields a batch list on each tick
-            item = batch[0] if isinstance(batch, list) else batch
-            choice = item.choices[0]
-            # delta schema: message.content holds incremental text in swift>=3
-            delta = getattr(getattr(choice, "delta", None), "content", None)
-            if delta is None:
+        for chunk in iterator:
+            if not hasattr(chunk, "choices") or not chunk.choices:
+                continue
+            choice = chunk.choices[0]
+            delta = getattr(getattr(choice, "delta", None), "content", "") or ""
+            if not delta:
                 delta = getattr(getattr(choice, "message", None), "content", "") or ""
+                # message.content is a running total in some swift versions — dedupe below
             if delta:
-                running += delta
+                if delta.startswith(running):
+                    # `delta` is already a running total; forward as-is
+                    running = delta
+                else:
+                    running += delta
                 yield running
