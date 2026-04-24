@@ -41,7 +41,22 @@ class ViewInfo(BaseModel):
     mp4Url: Optional[str] = None
 
 
+ClipKindT = Literal["dicom", "image", "video"]
+
+
+class ClipCard(BaseModel):
+    id: str
+    kind: ClipKindT
+    filename: str
+    isVideo: bool = False
+    thumbnailUrl: Optional[str] = None
+    mediaUrl: Optional[str] = None
+    view: Optional[str] = None
+    confidence: Optional[float] = None
+
+
 class StudyDetail(StudySummary):
+    clips: list[ClipCard] = Field(default_factory=list)
     views: list[ViewInfo] = Field(default_factory=list)
     reportId: Optional[str] = None
 
@@ -162,6 +177,35 @@ def _views_for(study: Study) -> list[ViewInfo]:
     return views
 
 
+def _clips_for(study: Study) -> list[ClipCard]:
+    """Every clip in the study, classified or not, with signed thumbnail and
+    (for videos) media URLs. The detail screen renders this list so the user
+    can always see what was uploaded, even if view classification didn't run.
+    """
+    cards: list[ClipCard] = []
+    for clip in study.clips:
+        thumb = sign_path(f"/api/mobile/v1/studies/{study.study_id}/clips/{clip.file_id}/thumbnail")
+        media = None
+        if clip.converted_path:
+            if clip.is_video:
+                media = sign_path(f"/api/mobile/v1/studies/{study.study_id}/clips/{clip.file_id}/video")
+            else:
+                # Non-video converted files (PNG/JPG) are served by the same
+                # thumbnail endpoint since the converted file *is* the image.
+                media = thumb
+        cards.append(ClipCard(
+            id=clip.file_id,
+            kind=clip.kind,  # type: ignore[arg-type]
+            filename=clip.original_filename or "",
+            isVideo=clip.is_video,
+            thumbnailUrl=thumb,
+            mediaUrl=media,
+            view=clip.effective_view,
+            confidence=clip.confidence,
+        ))
+    return cards
+
+
 @router.get("/studies", response_model=StudiesPage)
 def list_studies(
     cursor: Optional[str] = None,
@@ -191,6 +235,7 @@ def get_study(sid: str) -> StudyDetail:
     summary = _summarize(study)
     return StudyDetail(
         **summary.model_dump(),
+        clips=_clips_for(study),
         views=_views_for(study),
         reportId=_report_id_for(study),
     )
@@ -374,6 +419,7 @@ def create_study_from_upload(body: CreateStudyBody) -> StudyDetail:
     summary = _summarize(study)
     return StudyDetail(
         **summary.model_dump(),
+        clips=_clips_for(study),
         views=_views_for(study),
         reportId=_report_id_for(study),
     )
