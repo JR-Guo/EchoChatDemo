@@ -108,6 +108,30 @@ async def _stream_chat(root: Path, sid: str, question: str, engine) -> AsyncIter
         return
     images, videos = collect_media(study.clips)
 
+    # Pre-validate image files so a malformed PNG/JPEG does not hang the
+    # ms-swift worker pool. If PIL can't open something, drop it from the
+    # list and warn the user. Videos are validated lazily by decord downstream.
+    bad_images: list[str] = []
+    ok_images: list[str] = []
+    for p in images:
+        try:
+            from PIL import Image as _Image
+            with _Image.open(p) as _im:
+                _im.verify()
+            ok_images.append(p)
+        except Exception as _exc:
+            bad_images.append(p)
+    if bad_images and not ok_images and not videos:
+        yield _sse({
+            "type": "error",
+            "message": (
+                f"The uploaded media can't be read ({len(bad_images)} invalid file"
+                f"{'s' if len(bad_images) > 1 else ''}). Try re-uploading."
+            ),
+        })
+        return
+    images = ok_images
+
     prior = mobile_chat.load_messages(root)[:-1]  # exclude just-appended user msg
     query = _build_history_query(mobile_chat.context_window(prior), question)
 
