@@ -1,23 +1,26 @@
 """Non-DICOM media preprocessing: detect file type, copy into study, generate thumbnails.
 
 DICOM uploads still go through the existing `preprocess_adapter.run_study_preprocess`
-pipeline. This module handles the two new branches mobile adds in M3:
+pipeline. This module handles the branches mobile adds in M3:
 
+- **DICOM zip** (.zip containing one or more .dcm files): extract, copy each
+  into the study's `raw/`, caller runs preprocess over the set.
 - **Video** (.mp4/.mov): copy/rename into `converted/`, extract a middle frame
   via OpenCV as the thumbnail at `converted/<file_id>.thumb.png`.
 - **Image** (.png/.jpg/.jpeg): copy/rename into `converted/`, re-encode as
   PNG thumbnail at `converted/<file_id>.thumb.png`.
 
-No view classification here — that's best-effort / future work. `Clip.view`
-is left None; mobile studies will show `status="processing"` (or "ready" if
-at least one clip was DICOM-preprocessed into a known view).
+No view classification for non-DICOM — that's best-effort / future work.
+`Clip.view` is left None; such studies still show `status="ready"` because
+their `converted_path` points at something the inference engine can consume.
 """
 from __future__ import annotations
 
 import shutil
 import uuid
+import zipfile
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Iterable, Literal, Optional
 
 
 MediaKind = Literal["dicom", "video", "image"]
@@ -25,13 +28,19 @@ MediaKind = Literal["dicom", "video", "image"]
 
 DICOM_MAGIC_OFFSET = 128
 DICOM_MAGIC = b"DICM"
+ZIP_MAGIC = b"PK\x03\x04"
 
 _VIDEO_EXTS = {".mp4", ".mov", ".m4v"}
 _IMAGE_EXTS = {".png", ".jpg", ".jpeg"}
 
 
 def detect_kind(raw_path: Path, filename_hint: str = "") -> MediaKind | None:
-    """Return 'dicom' / 'video' / 'image' / None based on content then extension."""
+    """Return 'dicom' / 'video' / 'image' / None based on content then extension.
+
+    A .zip file is classified as 'dicom' only if it contains at least one DICOM
+    file; otherwise it's rejected. This keeps the surface small — we don't want
+    random archives creating empty studies.
+    """
     try:
         with raw_path.open("rb") as fh:
             head = fh.read(DICOM_MAGIC_OFFSET + 4)
@@ -39,6 +48,10 @@ def detect_kind(raw_path: Path, filename_hint: str = "") -> MediaKind | None:
         return None
     if len(head) >= DICOM_MAGIC_OFFSET + 4 and head[DICOM_MAGIC_OFFSET:DICOM_MAGIC_OFFSET + 4] == DICOM_MAGIC:
         return "dicom"
+
+    # ZIP archives: only accept if they contain DICOM inside.
+    if head.startswith(ZIP_MAGIC):
+        return "dicom" if _zip_has_dicom(raw_path) else None
 
     name_lower = (filename_hint or raw_path.name).lower()
     for ext in _VIDEO_EXTS:
@@ -56,6 +69,87 @@ def detect_kind(raw_path: Path, filename_hint: str = "") -> MediaKind | None:
     if head.startswith(b"\xff\xd8\xff"):
         return "image"
     return None
+
+
+def is_zip(raw_path: Path) -> bool:
+    try:
+        with raw_path.open("rb") as fh:
+            return fh.read(4) == ZIP_MAGIC
+    except OSError:
+        return False
+
+
+def _zip_has_dicom(raw_path: Path) -> bool:
+    """Scan a zip for at least one entry that looks like a DICOM file.
+
+    Reads at most a few KB per candidate member — O(n) members, bounded bytes,
+    no full decompression of large archives.
+    """
+    try:
+        with zipfile.ZipFile(raw_path) as zf:
+            for info in zf.infolist():
+                if info.is_dir() or info.file_size == 0:
+                    continue
+                name = info.filename.lower()
+                # Fast path: obvious DICOM extension
+                if name.endswith(".dcm") or name.endswith(".dicom"):
+                    return True
+                # Slow path: open a prefix and check DICM magic
+                try:
+                    with zf.open(info) as fh:
+                        prefix = fh.read(DICOM_MAGIC_OFFSET + 4)
+                except Exception:
+                    continue
+                if len(prefix) >= DICOM_MAGIC_OFFSET + 4 and \
+                        prefix[DICOM_MAGIC_OFFSET:DICOM_MAGIC_OFFSET + 4] == DICOM_MAGIC:
+                    return True
+    except zipfile.BadZipFile:
+        return False
+    return False
+
+
+def extract_dicoms_from_zip(zip_path: Path, dest_dir: Path, *, max_files: int = 500) -> list[Path]:
+    """Extract DICOM members from the zip into `dest_dir` using fresh 16-char ids
+    as filenames (to avoid collisions with user-supplied names). Returns the list
+    of new file paths. Skips non-DICOM entries silently.
+
+    Raises `ValueError` if nothing DICOM was found.
+    """
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    written: list[Path] = []
+    with zipfile.ZipFile(zip_path) as zf:
+        for info in zf.infolist():
+            if len(written) >= max_files:
+                break
+            if info.is_dir() or info.file_size == 0:
+                continue
+            name = info.filename.lower()
+            is_candidate = name.endswith(".dcm") or name.endswith(".dicom")
+            try:
+                with zf.open(info) as fh:
+                    if not is_candidate:
+                        prefix = fh.read(DICOM_MAGIC_OFFSET + 4)
+                        if len(prefix) < DICOM_MAGIC_OFFSET + 4 or \
+                                prefix[DICOM_MAGIC_OFFSET:DICOM_MAGIC_OFFSET + 4] != DICOM_MAGIC:
+                            continue
+                        # reopen to start from byte 0
+                        with zf.open(info) as fh2:
+                            _write_member(fh2, dest_dir, written)
+                    else:
+                        _write_member(fh, dest_dir, written)
+            except Exception:
+                continue
+    if not written:
+        raise ValueError("zip contains no DICOM files")
+    return written
+
+
+def _write_member(fh, dest_dir: Path, written: list[Path]) -> None:
+    fid = new_file_id()
+    out = dest_dir / f"{fid}.dcm"
+    with out.open("wb") as w:
+        shutil.copyfileobj(fh, w)
+    written.append(out)
 
 
 def new_file_id() -> str:

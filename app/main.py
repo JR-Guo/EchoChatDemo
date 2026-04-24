@@ -1,6 +1,9 @@
+import asyncio
+import logging
 import os
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -15,6 +18,12 @@ from app.routers.study import router as study_router
 from app.routers.tasks import router as tasks_router, set_engine
 from app.routers.report_io import router as report_io_router
 from app.routers.mobile import router as mobile_router
+from app.services.mobile_uploads import UploadStore
+
+
+logger = logging.getLogger("echochat.mobile.gc")
+
+MOBILE_UPLOAD_GC_INTERVAL_S = 3600  # hourly
 
 _start_time = time.monotonic()
 _model_ready = False
@@ -22,28 +31,47 @@ _model_ready = False
 templates = Jinja2Templates(directory="templates")
 
 
+async def _mobile_upload_gc_loop(settings_local) -> None:
+    """Sweep orphaned mobile uploads >24h old. Runs forever until cancelled."""
+    store = UploadStore(base_dir=Path(settings_local.data_dir) / "uploads")
+    while True:
+        try:
+            await asyncio.sleep(MOBILE_UPLOAD_GC_INTERVAL_S)
+            removed = await asyncio.to_thread(store.gc_orphans)
+            if removed:
+                logger.info("mobile upload GC removed %d orphan dirs", removed)
+        except asyncio.CancelledError:
+            return
+        except Exception as exc:
+            logger.warning("mobile upload GC error: %s", exc)
+
+
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
-    if os.environ.get("ECHOCHAT_SKIP_MODEL", "").lower() in ("1", "true", "yes"):
-        yield
-        return
-    import asyncio
-    from app.services.echochat_engine import EchoChatEngine, SwiftPtBackend
-
     settings_local = get_settings()
+    gc_task = asyncio.create_task(_mobile_upload_gc_loop(settings_local))
 
-    def _build():
-        be = SwiftPtBackend(str(settings_local.model_path))
-        return EchoChatEngine(backend=be)
-
-    eng = await asyncio.to_thread(_build)
-    set_engine(eng)
-    global _model_ready
-    _model_ready = True
     try:
+        if os.environ.get("ECHOCHAT_SKIP_MODEL", "").lower() in ("1", "true", "yes"):
+            yield
+            return
+        from app.services.echochat_engine import EchoChatEngine, SwiftPtBackend
+
+        def _build():
+            be = SwiftPtBackend(str(settings_local.model_path))
+            return EchoChatEngine(backend=be)
+
+        eng = await asyncio.to_thread(_build)
+        set_engine(eng)
+        global _model_ready
+        _model_ready = True
         yield
     finally:
-        pass
+        gc_task.cancel()
+        try:
+            await gc_task
+        except asyncio.CancelledError:
+            pass
 
 
 def create_app() -> FastAPI:

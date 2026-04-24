@@ -240,30 +240,45 @@ def _install_non_dicom(*, kind: str, upload_data: Path, original_filename: str,
 
 def _install_dicom(*, upload_data: Path, original_filename: str,
                    study_root: Path) -> list[Clip]:
-    """Copy the uploaded DICOM into `raw/`, run the existing preprocess
-    pipeline, and return one Clip per selected media output.
+    """Copy the uploaded DICOM (single file or a zip containing DICOMs) into
+    `raw/`, run the existing preprocess pipeline over all members, and return
+    one Clip per selected media output.
 
     Heavy: invokes view classification + DICOM-to-mp4 conversion. Typical
-    latency ~20-60s per file. Synchronous on purpose — matches the existing
-    web upload behavior. Gunicorn timeout is 600s in prod.
+    latency ~20-60s per DICOM file. Synchronous on purpose — matches the
+    existing web upload behavior. Gunicorn timeout is 600s in prod.
     """
     from app.services.preprocess_adapter import run_study_preprocess
 
-    file_id = mobile_media.new_file_id()
     raw_dir = study_root / "raw"
     raw_dir.mkdir(parents=True, exist_ok=True)
-    raw_dest = raw_dir / f"{file_id}.dcm"
-    mobile_media._move_or_copy(upload_data, raw_dest)
+
+    if mobile_media.is_zip(upload_data):
+        try:
+            raw_files = mobile_media.extract_dicoms_from_zip(upload_data, raw_dir)
+        except ValueError as exc:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+        # Remove the zip itself; raw_dir now holds <file_id>.dcm per member.
+        try:
+            upload_data.unlink()
+        except OSError:
+            pass
+    else:
+        file_id = mobile_media.new_file_id()
+        raw_dest = raw_dir / f"{file_id}.dcm"
+        mobile_media._move_or_copy(upload_data, raw_dest)
+        raw_files = [raw_dest]
+
+    clip_ids = [p.stem for p in raw_files]
 
     try:
         result = run_study_preprocess(
             raw_dir=raw_dir,
             all_output_dir=study_root / "preprocessed" / "all",
             selected_output_dir=study_root / "preprocessed" / "selected",
-            clip_ids=[file_id],
+            clip_ids=clip_ids,
         )
     except Exception as exc:
-        # Leave raw file on disk; surface the error so client can retry
         raise HTTPException(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"DICOM preprocess failed: {exc}",
@@ -271,25 +286,28 @@ def _install_dicom(*, upload_data: Path, original_filename: str,
 
     clips: list[Clip] = []
     media_map = result.selected or result.all_media
+
     if not media_map:
-        # Preprocess produced nothing usable — keep the raw clip anyway so
-        # the user sees it appeared on the server and can retry/delete.
-        clips.append(_build_clip(
-            file_id=file_id,
-            original_filename=original_filename,
-            kind="dicom",
-            raw_path=raw_dest,
-            converted_path=None,
-            is_video=True,
-        ))
+        # Preprocess produced nothing usable — keep raw-only clips so the user
+        # sees their upload appeared and can retry / delete.
+        for raw_path in raw_files:
+            clips.append(_build_clip(
+                file_id=raw_path.stem,
+                original_filename=original_filename,
+                kind="dicom",
+                raw_path=raw_path,
+                converted_path=None,
+                is_video=True,
+            ))
         return clips
 
+    raw_by_id = {p.stem: p for p in raw_files}
     for fid, media in media_map.items():
         clips.append(_build_clip(
             file_id=fid,
             original_filename=original_filename,
             kind="dicom",
-            raw_path=raw_dest,
+            raw_path=raw_by_id.get(fid, raw_files[0]),
             converted_path=media.path,
             is_video=media.is_video,
         ))
