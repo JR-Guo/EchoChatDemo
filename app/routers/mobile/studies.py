@@ -107,10 +107,11 @@ def _load_all_studies() -> list[Study]:
 
 
 def _status_for(study: Study) -> StudyStatus:
-    """Loose M1 derivation: ready if any clip has a view, else processing/queued."""
+    """Mobile status heuristic: ready when every clip has a converted_path
+    that the inference engine can consume (mp4/png); processing otherwise."""
     if not study.clips:
         return "queued"
-    if any(c.effective_view for c in study.clips):
+    if all(c.converted_path for c in study.clips):
         return "ready"
     return "processing"
 
